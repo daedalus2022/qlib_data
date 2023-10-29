@@ -16,23 +16,27 @@ pub struct Opts {
 // 更新命令方法，目前支持 当天数据更新
 #[derive(Parser, Debug)]
 pub enum UpdateCommand {
-    UpdateToday,
-    UpdateDay(UpdateDay)
+    UpdateToday(UpdateToday),
+    UpdateDay(UpdateDay),
 }
 
 // update day 子命令
-
 /// 更新当天股票数据
 #[derive(Parser, Debug)]
+pub struct UpdateToday {
+    /// 默认系统当前日期y-m-d
+    pub date: Option<String>,
+}
+
+/// 更新指定日期股票数据
+#[derive(Parser, Debug)]
 pub struct UpdateDay {
-    /// 使用数据源,默认sina
-    source: Option<String>,
+    /// 默认系统当前日期y-m-d
+    date: Option<String>,
 }
 
 #[cfg(test)]
 mod tests_command {
     #[test]
-    fn test_opt() {
-        
-    }
+    fn test_opt() {}
 }

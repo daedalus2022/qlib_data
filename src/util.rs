@@ -4,7 +4,6 @@ use polars::export::chrono::Local;
 
 use crate::const_vars;
 
-
 ///
 /// 环境工具
 ///
@@ -23,8 +22,6 @@ impl Envs {
     pub fn source_home() -> String {
         dotenvy::var(const_vars::SOURCE_DATA_HOME).unwrap()
     }
-
-    
 }
 
 pub struct DateUtils;

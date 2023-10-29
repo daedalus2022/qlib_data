@@ -19,13 +19,22 @@ use crate::{const_vars, util::DateUtils};
 ///
 /// 使用股票/股指数据 更新本地缓存
 ///
-pub async fn update_today_data(data_frame_opt: Option<DataFrame>) -> anyhow::Result<()> {
+pub async fn update_today_data(
+    date: Option<String>,
+    data_frame_opt: Option<DataFrame>,
+) -> anyhow::Result<()> {
     match data_frame_opt {
         Some(data_frame) => {
             // 1. 配置数据源目录
             let data_source_path = format!("{}", "source").to_string();
 
-            let current_date = DateUtils::now_fmt_ymd();
+            let mut current_date = DateUtils::now_fmt_ymd();
+
+            if let Some(d) = date {
+                current_date = d;
+            }
+
+            tracing::debug!("update date:{}", current_date);
 
             let dir_path = Path::new(&data_source_path);
             let entries = fs::read_dir(dir_path).expect("无法读取目录");
@@ -65,7 +74,7 @@ pub async fn update_today_data(data_frame_opt: Option<DataFrame>) -> anyhow::Res
                             )
                             .unwrap()
                             .to_string()
-                                == current_date
+                                == current_date.clone()
                         })
                         .is_none()
                     {
@@ -76,7 +85,7 @@ pub async fn update_today_data(data_frame_opt: Option<DataFrame>) -> anyhow::Res
                             .collect()?;
 
                         if let Ok(row) = row_data_frame.get_row(0) {
-                            let csv_row = row_to_csv(symbol, &row, headers);
+                            let csv_row = row_to_csv(current_date.clone(), symbol, &row, headers);
                             tracing::debug!("append:{:?} ,{}, to:{:?}", &row, csv_row, path);
                             append_to_csv(&path, csv_row);
                         }
@@ -97,7 +106,7 @@ pub async fn update_today_data(data_frame_opt: Option<DataFrame>) -> anyhow::Res
     Ok(())
 }
 
-fn row_to_csv(symbol: String, row: &Row, headers: Vec<&str>) -> String {
+fn row_to_csv(current_date: String, symbol: String, row: &Row, headers: Vec<&str>) -> String {
     let data = &row.0;
 
     let close = data[2].to_string();
@@ -109,7 +118,7 @@ fn row_to_csv(symbol: String, row: &Row, headers: Vec<&str>) -> String {
     let dividends = "0".to_string();
     let splits = "0".to_string();
     let symbol = symbol;
-    let now_fmt = DateUtils::now_fmt_ymd();
+    let now_fmt = current_date;
     let date = now_fmt;
 
     let mut kv = HashMap::new();
