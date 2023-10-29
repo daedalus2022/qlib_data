@@ -9,3 +9,6 @@
     3. 使用normalize数据重新构建qlib_data
     4. 
 
+## 使用说明
+1. qshare
+    1. 通过.env 配置缓存路径
