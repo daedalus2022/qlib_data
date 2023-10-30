@@ -204,7 +204,7 @@ mod test {
         let sina = SinaDataSource {};
         let em_data = sina.real_time_spot_em_data().await?.data.unwrap();
 
-        update_today_data(Some(em_data)).await?;
+        update_today_data(None, Some(em_data)).await?;
 
         Ok(())
     }
