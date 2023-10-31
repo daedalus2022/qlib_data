@@ -69,4 +69,4 @@ csv = { version = "1.1", features = [] }
 pbr = "1.0.3"
 
 # 量化数据源
-qshare="0.1.0"
+qshare="0.1.4"

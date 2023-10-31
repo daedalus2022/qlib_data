@@ -6,9 +6,7 @@ use polars::{
     lazy::dsl::{col, lit},
     prelude::{DataFrame, IntoLazy},
 };
-use std::fmt::Write as FmtWrite;
 use std::{
-    collections::HashMap,
     fs::{self, DirEntry},
     io::Write,
     path::Path,
@@ -22,6 +20,7 @@ use crate::{const_vars, util::DateUtils};
 pub async fn update_today_data(
     date: Option<String>,
     data_frame_opt: Option<DataFrame>,
+    row_to_csv: fn(current_date: String, symbol: String, row: &Row, headers: Vec<&str>) -> String,
 ) -> anyhow::Result<()> {
     match data_frame_opt {
         Some(data_frame) => {
@@ -45,6 +44,8 @@ pub async fn update_today_data(
             let entries = fs::read_dir(dir_path).expect("无法读取目录");
             for entry in entries {
                 let path = entry.expect("无法获取路径");
+                tracing::debug!("update file :{:?}", &path);
+
                 // 只处理.csv文件
                 if !path
                     .file_name()
@@ -63,27 +64,29 @@ pub async fn update_today_data(
                 if let Ok(stock_datas) = load_csv(&path.path()) {
                     // 表头
                     let headers: Vec<&str> = stock_datas.first().unwrap().iter().collect();
-                    if stock_datas
-                        .iter()
-                        .find(|s| {
-                            s.get(
-                                headers
-                                    .iter()
-                                    .position(|&x| x == const_vars::CSV_HEADER_DATE)
-                                    .unwrap(),
-                            )
-                            .unwrap()
-                            .to_string()
-                                == current_date.clone()
-                        })
-                        .is_none()
-                    {
+                    // 数据是否存在
+                    let target_row_opt = stock_datas.iter().find(|s| {
+                        s.get(
+                            headers
+                                .iter()
+                                .position(|&x| x == const_vars::CSV_HEADER_DATE)
+                                .unwrap(),
+                        )
+                        .unwrap()
+                            == current_date.clone()
+                    });
+
+                    if target_row_opt.is_none() {
                         let row_data_frame = data_frame
                             .clone()
                             .lazy()
-                            .filter(col(const_vars::CSV_HEADER_SYMBOL).eq(lit(symbol_code)))
+                            .filter(
+                                col(const_vars::CSV_HEADER_SYMBOL)
+                                    .eq(lit(symbol_code))
+                                    .or(col(const_vars::CSV_HEADER_SYMBOL).eq(lit(symbol.clone()))),
+                            )
                             .collect()?;
-
+                        tracing::debug!("更新:{:?} 日数据:{:?}", current_date, row_data_frame);
                         if let Ok(row) = row_data_frame.get_row(0) {
                             let csv_row = row_to_csv(current_date.clone(), symbol, &row, headers);
                             tracing::debug!("append:{:?} ,{}, to:{:?}", &row, csv_row, path);
@@ -104,48 +107,6 @@ pub async fn update_today_data(
     }
 
     Ok(())
-}
-
-fn row_to_csv(current_date: String, symbol: String, row: &Row, headers: Vec<&str>) -> String {
-    let data = &row.0;
-
-    let close = data[2].to_string();
-    let open = data[10].to_string();
-    let volume = data[5].to_string();
-    let low = data[9].to_string();
-    let high = data[8].to_string();
-    let adjclose = data[11].to_string();
-    let dividends = "0".to_string();
-    let splits = "0".to_string();
-    let symbol = symbol;
-    let now_fmt = current_date;
-    let date = now_fmt;
-
-    let mut kv = HashMap::new();
-    kv.insert("close", close);
-    kv.insert("open", open);
-    kv.insert("volume", volume);
-    kv.insert("low", low);
-    kv.insert("high", high);
-    kv.insert("adjclose", adjclose);
-    kv.insert("dividends", dividends);
-    kv.insert("splits", splits);
-    kv.insert("symbol", symbol);
-    kv.insert("date", date);
-
-    let mut csv_row = String::new();
-    for h in &headers {
-        if let Some(v) = kv.get(h) {
-            csv_row
-                .write_fmt(format_args!("{},", v.as_str()))
-                .expect("格式化错误");
-        } else {
-            csv_row.write_fmt(format_args!(",")).expect("格式化错误");
-        }
-    }
-
-    tracing::debug!("{:?}, {}", &headers, &csv_row);
-    format!("{}\r\n", csv_row.as_str()[..csv_row.len() - 1].to_string()).to_string()
 }
 
 ///
@@ -179,32 +140,44 @@ pub fn load_csv(path: &Path) -> anyhow::Result<Vec<StringRecord>> {
 
 #[cfg(test)]
 mod test {
-    use qshare::{sina::stock::SinaDataSource, RealTimeData};
+    use qshare::{
+        sina::stock::{eastmoney::EastmoneySpotEmDataSource, sina::SinaIndexSpotDataSource},
+        RealTimeData,
+    };
 
     use crate::source_data::update_today_data;
 
     ///
     /// 更新股票指数当天数据
     ///
-    // #[tokio::test]
-    // pub async fn update_spot_today_data() -> anyhow::Result<()> {
-    //     let sina = SinaDataSource {};
-    //     let em_data = sina.real_time_spot_data().await?.data.unwrap();
+    #[tokio::test]
+    pub async fn update_spot_today_data() -> anyhow::Result<()> {
+        std::env::set_var("RUST_LOG", "qlib_data=debug");
+        // 初始化日志
+        tracing_subscriber::fmt::init();
 
-    //     update_today_data(Some(em_data)).await?;
+        let sina = SinaIndexSpotDataSource {};
+        let em_data = sina.real_time_data().await?.data.unwrap();
 
-    //     Ok(())
-    // }
+        update_today_data(
+            None,
+            Some(em_data),
+            crate::util::IoUtils::spot_index_row_to_csv(),
+        )
+        .await?;
+
+        Ok(())
+    }
 
     ///
     /// 更新股票当天数据
     ///
     #[tokio::test]
     pub async fn update_spot_em_today_data() -> anyhow::Result<()> {
-        let sina = SinaDataSource {};
-        let em_data = sina.real_time_spot_em_data().await?.data.unwrap();
+        let source = EastmoneySpotEmDataSource {};
+        let em_data = source.real_time_data().await?.data.unwrap();
 
-        update_today_data(None, Some(em_data)).await?;
+        update_today_data(None, Some(em_data), crate::util::IoUtils::em_row_to_csv()).await?;
 
         Ok(())
     }
