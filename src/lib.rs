@@ -1,5 +1,6 @@
 pub mod command;
 pub mod const_vars;
+pub mod normalize_data;
 pub mod source_data;
 pub mod util;
 ///
