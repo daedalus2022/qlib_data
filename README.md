@@ -24,3 +24,4 @@ export LIBTORCH_LIB=/Users/tom/Downloads/libtorch
 export LIBTORCH=/Users/tom/Downloads/libtorch
 export DYLD_LIBRARY_PATH=/Users/tom/Downloads/libtorch/lib:$DYLD_LIBRARY_PATH
 3. ubuntu22.04.3版本上使用 Tesla M40（NVIDIA-Linux-x86_64-535.129.03.run） cuda118版本，测试tch cuda版本通过（缺少包可以拷贝到debug下）
+- `cargo test --test tch_test`
