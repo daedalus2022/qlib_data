@@ -32,7 +32,7 @@ pub struct UpdateToday {
 #[derive(Parser, Debug)]
 pub struct UpdateDay {
     /// 默认系统当前日期y-m-d
-    date: Option<String>,
+    pub date: Option<String>,
 }
 
 #[cfg(test)]
