@@ -2,7 +2,7 @@ use async_std::fs::{self as sync_fs, DirEntry};
 use async_std::stream::StreamExt;
 use pbr::ProgressBar;
 use polars::export::num::ToPrimitive;
-use polars::prelude::{CsvReader, CsvWriter, SerReader, SerWriter};
+use polars::prelude::{CsvReader, CsvWriter, SerReader, SerWriter, DataFrame, UniqueKeepStrategy};
 use std::fs;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
@@ -66,18 +66,53 @@ async fn process(
     Ok(())
 }
 
-// async fn normalize(df: DataFrame) -> anyhow::Result<DataFrame>{
-//     //1. 初始化
+////
+/// df 标准化归一化处理
+///
+async fn normalize(df: Option<DataFrame>) -> anyhow::Result<DataFrame>{
+    if let Some(df) = df{
+        // 1. 删除数据框中重复的行，保留每行的第一个副本 df = df[~df.index.duplicated(keep="first")]
+        let df = df.unique_stable(Some(&vec![String::from("date")]),UniqueKeepStrategy::Last).unwrap();
+        tracing::debug!("删除数据框中重复的行，保留每行的第一个副本 df:{:?}", df);
+        // TODO: 2.字符串数据类型和不保留默认 NaN 值
+        // 3. 归一化/标准化处理
 
-//     // 1. 删除数据框中重复的行，保留每行的第一个副本 df = df[~df.index.duplicated(keep="first")]
-//     // 2.
-//     Ok(DataFrame::empty())
-// }
+
+
+        return Ok(DataFrame::empty());
+    }
+
+    Ok(DataFrame::empty())
+}
+
+
+
+
 
 #[cfg(test)]
 mod test {
+    use polars::prelude::{CsvReader, SerReader};
+
     use crate::normalize_data::traverse_source_directory;
     use crate::util::Envs;
+
+    use super::normalize;
+
+    #[tokio::test]
+    pub async fn normalize_format_works()->anyhow::Result<()>{
+        std::env::set_var("RUST_LOG", "qlib_data=debug");
+        // 初始化日志
+        tracing_subscriber::fmt::init();
+
+        let path = "source/sh603105.csv";
+        let  df = CsvReader::from_path(path).unwrap().finish().unwrap();
+
+        tracing::debug!("df:{:?}", df);
+
+        normalize(Some(df)).await?;
+
+        Ok(())
+    }
 
     #[tokio::test]
     pub async fn traverse_source_directory_works() -> anyhow::Result<()> {

@@ -3,6 +3,20 @@ mod test_3rd_works {
     use polars::prelude::DataFrame;
     use polars::prelude::*;
 
+    #[tokio::test]
+    async fn polars_duplicated()->anyhow::Result<()>{
+        let df: DataFrame = df!("date" => &["2023-10-31", "2023-10-31", "2023-10-30"],
+                        "open" => &["3581.6759", "3582.6759", "3571.6759"])?;
+
+        let df = df.unique_stable(Some(&vec![String::from("date")]),UniqueKeepStrategy::Last).unwrap();
+
+        println!("polars_duplicated:{:?}", df);
+
+        assert!(df.iter().count() == 2);
+
+        Ok(())
+    }
+
     #[test]
     fn polars_normalized_works() {
         let df_customers = df! (
@@ -17,6 +31,8 @@ mod test_3rd_works {
         let df2: DataFrame = df_customers.describe(None).unwrap();
 
         println!("{}", &df2);
+
+
 
         // // 打印原始 DataFrame
         // println!("原始 DataFrame：");
