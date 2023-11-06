@@ -85,6 +85,61 @@ async fn normalize(df: Option<DataFrame>) -> anyhow::Result<DataFrame>{
     Ok(DataFrame::empty())
 }
 
+pub fn tch_normalization(tch_matrix: &[Vec<f64>]) -> Vec<Vec<f64>> {
+    // 计算均值向量
+    let mean_vector = calculate_mean_vector(tch_matrix);
+    // 计算标准差向量
+    let std_vector = calculate_standard_deviation_vector(tch_matrix);
+    // 归一化处理
+    let normalized_tch_matrix = normalize_matrix(tch_matrix, &mean_vector, &std_vector);
+    normalized_tch_matrix
+}
+
+fn calculate_mean_vector(tch_matrix: &[Vec<f64>]) -> Vec<f64> {
+    let mut mean_vector = vec![];
+    for row in tch_matrix {
+        let mut sum = 0.0;
+        for &value in row {
+            sum += value;
+        }
+        mean_vector.push(sum / tch_matrix.len() as f64);
+    }
+    mean_vector
+}
+fn calculate_standard_deviation_vector(tch_matrix: &[Vec<f64>]) -> Vec<f64> {
+    let mut std_vector = vec![];
+    for row in tch_matrix {
+        let mut variance = 0.0;
+        let mean = calculate_mean(row);
+        for &value in row {
+            variance += (value - mean) * (value - mean);
+        }
+        std_vector.push(variance.sqrt() as f64);
+    }
+    std_vector
+}
+
+fn calculate_mean(numbers: &Vec<f64>) -> f64 {
+    let sum = numbers.iter().sum::<f64>();
+    let length = numbers.len() as f64;
+    sum as f64 / length
+}
+
+fn normalize_matrix(
+    tch_matrix: &[Vec<f64>],
+    mean_vector: &Vec<f64>,
+    std_vector: &Vec<f64>,
+) -> Vec<Vec<f64>> {
+    let mut normalized_tch_matrix = vec![Vec::new(); tch_matrix.len()];
+    for (i, row) in tch_matrix.iter().enumerate() {
+        let mut normalized_row = vec![0.0; row.len()];
+        for (j, &value) in row.iter().enumerate() {
+            normalized_row[j] = (value - mean_vector[i]) / std_vector[i];
+        }
+        normalized_tch_matrix.push(normalized_row);
+    }
+    normalized_tch_matrix
+}
 
 
 
@@ -93,10 +148,27 @@ async fn normalize(df: Option<DataFrame>) -> anyhow::Result<DataFrame>{
 mod test {
     use polars::prelude::{CsvReader, SerReader};
 
-    use crate::normalize_data::traverse_source_directory;
+    use crate::normalize_data::{tch_normalization, traverse_source_directory};
     use crate::util::Envs;
 
     use super::normalize;
+
+    #[test]
+    pub fn normalization_works(){
+        std::env::set_var("RUST_LOG", "qlib_data=debug");
+        // 初始化日志
+        tracing_subscriber::fmt::init();
+
+        let tch_matrix: Vec<Vec<f64>> = vec![
+            vec![1.0, 2.0, 3.0],
+            vec![4.0, 5.0, 6.0],
+            vec![7.0, 8.0, 9.0],
+        ];
+        let normalized_tch_matrix = tch_normalization(&tch_matrix);
+        for row in normalized_tch_matrix {
+            tracing::debug!("row: {:?}", row);
+        }
+    }
 
     #[tokio::test]
     pub async fn normalize_format_works()->anyhow::Result<()>{

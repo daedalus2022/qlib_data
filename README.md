@@ -18,10 +18,11 @@
 
 ## libtorch 安装
 1. 下载： https://download.pytorch.org/libtorch/cpu/libtorch-macos-2.1.0.zip
-2. 配置环境变量：*注意三个地址都配置到libtorch的根目录，不要加lib和incloud*
+2. macos 配置环境变量：*注意三个地址都配置到libtorch的根目录，不要加lib和incloud*
 export LIBTORCH_INCLUDE=/Users/tom/Downloads/libtorch
 export LIBTORCH_LIB=/Users/tom/Downloads/libtorch
 export LIBTORCH=/Users/tom/Downloads/libtorch
 export DYLD_LIBRARY_PATH=/Users/tom/Downloads/libtorch/lib:$DYLD_LIBRARY_PATH
 3. ubuntu22.04.3版本上使用 Tesla M40（NVIDIA-Linux-x86_64-535.129.03.run） cuda118版本，测试tch cuda版本通过（缺少包可以拷贝到debug下）
+- `export LD_LIBRARY_PATH=${LIBTORCH}/lib:$LD_LIBRARY_PATH`
 - `cargo test --test tch_test`
