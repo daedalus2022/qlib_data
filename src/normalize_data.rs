@@ -2,18 +2,22 @@ use async_std::fs::{self as sync_fs, DirEntry};
 use async_std::stream::StreamExt;
 use pbr::ProgressBar;
 use polars::export::num::ToPrimitive;
-use polars::prelude::{CsvReader, CsvWriter, SerReader, SerWriter, DataFrame, UniqueKeepStrategy};
+use polars::lazy::dsl::{col, lit};
+use polars::prelude::{CsvReader, CsvWriter, SerReader, SerWriter, DataFrame, UniqueKeepStrategy, AnyValue, IntoLazy};
+use std::f64::NAN;
 use std::fs;
+use std::ops::Index;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use tokio::task;
+use crate::const_vars::{self, CSV_HEADER_ADJCLOSE};
 
 ///
 /// 遍历source目录
 ///
 pub async fn traverse_source_directory(dir: &str) -> anyhow::Result<()> {
     // 遍历文件夹
-    let mut tasks = vec![];
+    // let mut tasks = vec![];
 
     let dir_path = Path::new(&dir);
 
@@ -30,14 +34,15 @@ pub async fn traverse_source_directory(dir: &str) -> anyhow::Result<()> {
             let pbr = pb.clone();
             if let Ok(entry) = entry_res {
                 let entry_clone = Arc::new(entry);
-                tasks.push(task::spawn(process(entry_clone.clone(), pbr)));
+                process(entry_clone.clone(), pbr).await?;
+                // tasks.push(task::spawn(process(entry_clone.clone(), pbr)));
             }
         }
 
         // 等待所有任务完成
-        for task in tasks {
-            let _ = task.await?;
-        }
+        // for task in tasks {
+        //     let _ = task.await?;
+        // }
 
         pb.lock().unwrap().finish_println("处理完成");
     }
@@ -55,6 +60,11 @@ async fn process(
     println!("update file :{:?}", path);
     if let Some(file) = path.path().to_str() {
         let mut df = CsvReader::from_path(file).unwrap().finish().unwrap();
+
+        df = normalize(Some(df)).await?;
+
+        tracing::debug!("normalize: {}", df);
+
         let mut file = std::fs::File::create(file.replace("source", "normalize")).unwrap();
         CsvWriter::new(&mut file).finish(&mut df).unwrap();
 
@@ -66,23 +76,137 @@ async fn process(
     Ok(())
 }
 
+///
+/// 生成 factor
+/// ```py
+///         if "adjclose" in df:
+// df["factor"] = df["adjclose"] / df["close"]
+// df["factor"] = df["factor"].fillna(method="ffill")
+// else:
+// df["factor"] = 1
+// for _col in self.COLUMNS:
+// if _col not in df.columns:
+//     continue
+// if _col == "volume":
+//     df[_col] = df[_col] / df["factor"]
+// else:
+//     df[_col] = df[_col] * df["factor"]
+/// 
+/// ```
+/// date,open,close,high,low,volume,money,change,adjclose,symbol,dividends,splits
+/// date,open,high,volume,low,close,adjclose,dividends,splits,symbol
+/// 
+pub async fn adjusted_price(df: Option<DataFrame>) -> anyhow::Result<DataFrame>{
+    if let Some(df) = df{
+        let colum_names = df.get_column_names();
+        let mut cols = vec![];
+        for c in colum_names{
+            cols.push((col(c)));
+        }
+        
+        if df.get_column_names().contains(&CSV_HEADER_ADJCLOSE){
+            cols.push(((col("adjclose")/col("close")).alias("factor")));
+            let df_manual = df
+            .clone()
+            .lazy()
+            .select(cols)
+            .collect()?;
+
+            let mut cols = vec![];
+            let p_c = vec!["open", "close", "high", "low"];
+            for c in df_manual.get_column_names(){
+                if "volume" == c {
+                    cols.push((col(c)/col("factor")));
+                }else if p_c.contains(&c){
+                    cols.push((col(c)*col("factor")));
+                }else{
+                    cols.push((col(c)));
+                }
+            }
+
+            //["open", "close", "high", "low", "volume"]
+            let df_manual = df_manual
+            .clone()
+            .lazy()
+            .select(cols)
+            .collect()?;
+
+            return Ok(df_manual);
+        }else{
+            let df_manual = df
+            .clone()
+            .lazy()
+            .with_columns([col("factor").fill_null(lit(1))])
+            .select(cols)
+            .collect()?;
+            return Ok(df_manual);
+        }
+    }
+    Ok(DataFrame::empty())
+}
+
 ////
 /// df 标准化归一化处理
 ///
 async fn normalize(df: Option<DataFrame>) -> anyhow::Result<DataFrame>{
     if let Some(df) = df{
         // 1. 删除数据框中重复的行，保留每行的第一个副本 df = df[~df.index.duplicated(keep="first")]
-        let df = df.unique_stable(Some(&vec![String::from("date")]),UniqueKeepStrategy::Last).unwrap();
+        let df = df.unique_stable(Some(&vec![String::from(const_vars::CSV_HEADER_DATE)]),UniqueKeepStrategy::Last).unwrap();
+        // 2. 按时间字段排序
+        let sort_df = df.sort(&[const_vars::CSV_HEADER_DATE], vec![false]).unwrap();
+
         tracing::debug!("删除数据框中重复的行，保留每行的第一个副本 df:{:?}", df);
         // TODO: 2.字符串数据类型和不保留默认 NaN 值
         // 3. 归一化/标准化处理
+        // 4. manual adjust data: All fields (except symbol、adjclose、change) are standardized according to the close of the first day
+        if let Some(first_close) = get_first_close(&sort_df).await{
 
+            let df = adjusted_price(Some(sort_df)).await.ok().unwrap();
+            tracing::debug!("adjusted_price df :{}", df);
 
+            let df_manual = df
+            .clone()
+            .lazy()
+            .with_columns([(col("dividends").fill_null(NAN)),(col("splits").fill_null(NAN))])
+            .select([
+                (col("symbol")),
+                (col("date")),
+                (col("open") / lit(first_close)),
+                (col("close") / lit(first_close)),
+                (col("high") / lit(first_close)),
+                (col("low") / lit(first_close)),
+                (col("volume") * lit(first_close)),
+                (col("money") / lit(first_close)),
+                (col("change")),
+                (col("adjclose")),
+                // (col("dividends")/ lit(first_close)),
+                // (col("splits")/ lit(first_close)),
+                (col("factor")/ lit(first_close)),
+            ])
+            .collect()?;
+            tracing::debug!("df_manual:{}", df_manual);
+
+            return Ok(df_manual);
+        }
 
         return Ok(DataFrame::empty());
     }
 
     Ok(DataFrame::empty())
+}
+
+///
+/// 获取first close
+/// 
+pub async fn get_first_close(sort_df: &DataFrame) -> Option<f64> {
+    let head_1_df = sort_df.head(Some(1));
+    let dates = head_1_df.column(const_vars::CSV_HEADER_CLOSE).ok().unwrap();
+
+    if let AnyValue::Float64(first_close) = dates.get(0).ok().unwrap(){
+        return Some(first_close);
+    }
+
+    None
 }
 
 pub fn tch_normalization(tch_matrix: &[Vec<f64>]) -> Vec<Vec<f64>> {
@@ -146,9 +270,12 @@ fn normalize_matrix(
 
 #[cfg(test)]
 mod test {
-    use polars::prelude::{CsvReader, SerReader};
+    use std::{time, thread};
 
-    use crate::normalize_data::{tch_normalization, traverse_source_directory};
+    use polars::lazy::dsl::col;
+    use polars::prelude::{CsvReader, SerReader, IntoLazy};
+
+    use crate::normalize_data::{tch_normalization, traverse_source_directory, get_first_close, adjusted_price};
     use crate::util::Envs;
 
     use super::normalize;
@@ -171,25 +298,76 @@ mod test {
     }
 
     #[tokio::test]
-    pub async fn normalize_format_works()->anyhow::Result<()>{
+    async fn adjusted_price_works()->anyhow::Result<()>{
+        
         std::env::set_var("RUST_LOG", "qlib_data=debug");
         // 初始化日志
         tracing_subscriber::fmt::init();
 
-        let path = "source/sh603105.csv";
+        let path = "source/sh601500.csv";
         let  df = CsvReader::from_path(path).unwrap().finish().unwrap();
 
+        let df = adjusted_price(Some(df)).await?;
         tracing::debug!("df:{:?}", df);
 
-        normalize(Some(df)).await?;
+        let path = "source/sh000300.csv";
+        let  df = CsvReader::from_path(path).unwrap().finish().unwrap();
+
+        let df = adjusted_price(Some(df)).await?;
+        tracing::debug!("df:{:?}", df);
 
         Ok(())
     }
 
     #[tokio::test]
+    pub async fn normalize_format_works()->anyhow::Result<()>{
+        std::env::set_var("RUST_LOG", "qlib_data=debug");
+        // 初始化日志
+        tracing_subscriber::fmt::init();
+
+        let path = "source/sh000300.csv";
+        let  df = CsvReader::from_path(path).unwrap().finish().unwrap();
+
+        tracing::debug!("df:{:?}", df);
+
+        let df = normalize(Some(df)).await?;
+
+        tracing::debug!("normalize df:{:?}", df);
+
+        Ok(())
+    }
+    #[tokio::test]
+    pub async fn get_first_close_works()->anyhow::Result<()>{
+        std::env::set_var("RUST_LOG", "qlib_data=debug");
+        // 初始化日志
+        tracing_subscriber::fmt::init();
+
+        let path = "source/sh000300.csv";
+        let  df = CsvReader::from_path(path).unwrap().finish().unwrap();
+
+        tracing::debug!("df:{:?}", df);
+
+        let first_close = get_first_close(&df).await;
+
+        assert_eq!(first_close.unwrap(), 5385.1_f64);
+
+        Ok(())
+    }
+
+    
+
+    #[tokio::test]
     pub async fn traverse_source_directory_works() -> anyhow::Result<()> {
         std::env::set_var("RUST_LOG", "qlib_data=debug");
-        traverse_source_directory(&Envs::source_home()).await?;
+        
+        traverse_source_directory(&Envs::source_home()).await?;    
+        let ten_millis = time::Duration::from_millis(30);
+        loop {
+            thread::sleep(ten_millis);
+            println!("等待处理...");
+        }
+        
+        
         Ok(())
     }
 }

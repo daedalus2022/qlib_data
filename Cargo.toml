@@ -76,3 +76,23 @@ qshare="0.1.4"
 
 # 模型训练
 tch = "0.14.0"
+nn = "0.1.6"
+
+## ml
+## 
+linfa = "0.7.0"  
+linfa-nn="0.7.0"
+linfa-elasticnet = "0.7.0"
+linfa-logistic = "0.7.0"
+ndarray = "0.15"
+#rand = "0.8.5"
+#num-traits = "0.2.17"
+linfa-datasets = { version = "0.7", features = ["diabetes"] }
+
+
+
+#ndarray = "0.15"
+#ndarray-nn = "0.5"
+#ndarray-rand = "0.14.0"
+#linfa = "0.7.0"
+#linfa-nn = "0.7.0"

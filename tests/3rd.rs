@@ -17,6 +17,28 @@ mod test_3rd_works {
         Ok(())
     }
 
+    #[tokio::test]
+    async fn polars_first_work()->anyhow::Result<()>{
+        let df: DataFrame = df!("date" => &["2023-10-31", "2023-11-01", "2023-10-30"],
+                        "open" => &["3581.6759", "3582.6759", "3571.6759"])?;
+
+        let sort_df = df.sort(&["date"], vec![false]).unwrap();
+        let head_1_df = sort_df.head(Some(1));
+
+        let dates = head_1_df.column("date").ok().unwrap();
+        if let AnyValue::Utf8(first_date) = dates.get(0).ok().unwrap(){
+            println!("head_1_df:{:?}, dates: {}, first_date: {}", head_1_df,dates,first_date);
+
+            assert_eq!(first_date.to_string(), "2023-10-30", "we are testing addition with {} and {}", first_date.to_string(), "2023-10-30");
+        }else{
+            assert!(false, "type not utf8");
+        }
+
+       
+
+        Ok(())
+    }
+
     #[test]
     fn polars_normalized_works() {
         let df_customers = df! (

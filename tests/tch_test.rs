@@ -1,8 +1,9 @@
 #[cfg(test)]
 mod alstm {
-    use tch::nn::OptimizerConfig;
-    use tch::{kind, nn::{self, Module}, Device, Tensor, Kind};
+    use std::borrow::Borrow;
 
+    use tch::nn::{OptimizerConfig, lstm, RNNConfig, Path, RNN};
+    use tch::{kind, nn::{self,LSTM,Module}, Device, Tensor, Kind};
     fn my_module(p: nn::Path, dim: i64) -> impl nn::Module {
         let x1 = p.zeros("x1", &[dim]);
         let x2 = p.zeros("x2", &[dim]);
@@ -14,6 +15,7 @@ mod alstm {
         let std = input.std(false);
 
         let normalized_input = input - mean;
+        
         normalized_input / std
     }
 
@@ -66,4 +68,32 @@ mod alstm {
             opt.backward_step(&loss);
         }
     }
+
+    #[test]
+    fn lstm_is_works(){
+        let device = Device::cuda_if_available();
+        let input_size = 10;
+        let hidden_size = 5;
+        let batch_size = 1;
+        let seq_len = 3;
+        let vs = nn::VarStore::new(device);
+        let b = vs.root();//Borrow::<Path>::borrow();
+    
+        let c = RNNConfig::default();
+    
+        let mut lstm = lstm(b, input_size,hidden_size, c);//LSTM::new(&lstm_desc, Kind::Float, device);
+    
+        let input = Tensor::randn(&[seq_len, batch_size, input_size], (Kind::Float, device));
+        let h0 = Tensor::zeros(&[c.num_layers, batch_size, hidden_size], (Kind::Float, device));
+        let c0 = Tensor::zeros(&[c.num_layers, batch_size, hidden_size], (Kind::Float, device));
+    
+        // let (output, _) = lstm
+        //     .forward(&input, Some((&h0, &c0)))
+        //     .unwrap();
+        let (output, _) = lstm.seq(&input);
+
+        println!("output: {:?}", output);
+    }
+
+
 }

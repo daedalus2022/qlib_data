@@ -8,4 +8,6 @@ pub const SOURCE_DATA_HOME: &str = "SOURCE_DATA_HOME";
 
 /// csv 表头
 pub const CSV_HEADER_DATE: &str = "date";
+pub const CSV_HEADER_CLOSE: &str = "close";
+pub const CSV_HEADER_ADJCLOSE: &str = "adjclose";
 pub const CSV_HEADER_SYMBOL: &str = "symbol";
