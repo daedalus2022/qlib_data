@@ -25,7 +25,7 @@ pub async fn update_today_data(
     match data_frame_opt {
         Some(data_frame) => {
             // 1. 配置数据源目录
-            let data_source_path = format!("{}", "source").to_string();
+            let data_source_path = "source";
 
             let mut current_date = DateUtils::now_fmt_ymd();
 

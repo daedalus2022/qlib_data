@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::Parser;
 use qlib_data::{
-    command::{self, Opts, UpdateToday, UpdateDay},
+    command::{self, Opts, UpdateDay},
     source_data,
 };
 use qshare::{
@@ -25,7 +25,7 @@ async fn main() -> anyhow::Result<()> {
         command::UpdateCommand::UpdateDay(args) => {
             // 更新指定日期数据，前提是已经缓存过实时行情
             update_today(Some(args)).await?;
-        },
+        }
     };
 
     Ok(())
@@ -50,7 +50,7 @@ async fn update_today(args: Option<UpdateDay>) -> Result<()> {
     let spot_data = sina_source.real_time_data().await?;
 
     if let Some(args_opt) = args {
-        if let Some(date) = args_opt.date{
+        if let Some(date) = args_opt.date {
             tracing::debug!("更新实时行情数据:{:?}", &em_data);
             source_data::update_today_data(
                 Some(date.clone()),

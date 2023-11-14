@@ -99,7 +99,7 @@ impl IoUtils {
             }
 
             tracing::debug!("{:?}, {}", &headers, &csv_row);
-            format!("{}\r\n", csv_row.as_str()[..csv_row.len() - 1].to_string()).to_string()
+            format!("{}\r\n", &csv_row.as_str()[..csv_row.len() - 1].to_string()).to_string()
         }
     }
 
@@ -148,7 +148,7 @@ impl IoUtils {
             }
 
             tracing::debug!("{:?}, {}", &headers, &csv_row);
-            format!("{}\r\n", csv_row.as_str()[..csv_row.len() - 1].to_string()).to_string()
+            format!("{}\r\n", &csv_row.as_str()[..csv_row.len() - 1].to_string()).to_string()
         }
     }
 }

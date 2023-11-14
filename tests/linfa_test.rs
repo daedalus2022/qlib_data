@@ -1,23 +1,19 @@
-use linfa::traits::Fit;
-use linfa_logistic::LogisticRegression;
-use ndarray::{s, stack, Array2, Axis};
-use tch::nn::Sequential;
-use std::ops::{ControlFlow};
-use std::ops::{AddAssign, Mul};
 use linfa::prelude::Predict;
 use linfa::prelude::SingleTargetRegression;
+use linfa::traits::Fit;
 use linfa_elasticnet::{ElasticNet, Result};
 
 #[test]
 fn test_() -> Result<()> {
-    let (train, valid) = linfa_datasets::diabetes()
-    .split_with_ratio(0.9);
+    let (train, valid) = linfa_datasets::diabetes().split_with_ratio(0.9);
 
     // train pure LASSO model with 0.1 penalty
     let model = ElasticNet::params()
         .penalty(0.1)
         .l1_ratio(1.0)
         .fit(&train)?;
+
+    println!("train:{:?}", train);
 
     println!("z score: {:?}", model.z_score());
 
@@ -133,7 +129,7 @@ fn test_() -> Result<()> {
 
 // fn prepare_data() -> (Dataset<f32>, Dataset<f32>) {
 //     let ds = iris();
-    
+
 //     // load MNIST data
 //     let (train, valid, _test) = (ds.nsamples(), ds.nfeatures(), ds.ntargets());
 

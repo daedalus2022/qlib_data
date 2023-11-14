@@ -4,11 +4,13 @@ mod test_3rd_works {
     use polars::prelude::*;
 
     #[tokio::test]
-    async fn polars_duplicated()->anyhow::Result<()>{
+    async fn polars_duplicated() -> anyhow::Result<()> {
         let df: DataFrame = df!("date" => &["2023-10-31", "2023-10-31", "2023-10-30"],
                         "open" => &["3581.6759", "3582.6759", "3571.6759"])?;
 
-        let df = df.unique_stable(Some(&vec![String::from("date")]),UniqueKeepStrategy::Last).unwrap();
+        let df = df
+            .unique_stable(Some(&vec![String::from("date")]), UniqueKeepStrategy::Last)
+            .unwrap();
 
         println!("polars_duplicated:{:?}", df);
 
@@ -18,7 +20,7 @@ mod test_3rd_works {
     }
 
     #[tokio::test]
-    async fn polars_first_work()->anyhow::Result<()>{
+    async fn polars_first_work() -> anyhow::Result<()> {
         let df: DataFrame = df!("date" => &["2023-10-31", "2023-11-01", "2023-10-30"],
                         "open" => &["3581.6759", "3582.6759", "3571.6759"])?;
 
@@ -26,15 +28,22 @@ mod test_3rd_works {
         let head_1_df = sort_df.head(Some(1));
 
         let dates = head_1_df.column("date").ok().unwrap();
-        if let AnyValue::Utf8(first_date) = dates.get(0).ok().unwrap(){
-            println!("head_1_df:{:?}, dates: {}, first_date: {}", head_1_df,dates,first_date);
+        if let AnyValue::Utf8(first_date) = dates.get(0).ok().unwrap() {
+            println!(
+                "head_1_df:{:?}, dates: {}, first_date: {}",
+                head_1_df, dates, first_date
+            );
 
-            assert_eq!(first_date.to_string(), "2023-10-30", "we are testing addition with {} and {}", first_date.to_string(), "2023-10-30");
-        }else{
+            assert_eq!(
+                first_date.to_string(),
+                "2023-10-30",
+                "we are testing addition with {} and {}",
+                first_date.to_string(),
+                "2023-10-30"
+            );
+        } else {
             assert!(false, "type not utf8");
         }
-
-       
 
         Ok(())
     }
@@ -53,8 +62,6 @@ mod test_3rd_works {
         let df2: DataFrame = df_customers.describe(None).unwrap();
 
         println!("{}", &df2);
-
-
 
         // // 打印原始 DataFrame
         // println!("原始 DataFrame：");
