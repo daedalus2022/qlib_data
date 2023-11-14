@@ -2,11 +2,11 @@ use polars::frame::DataFrame;
 
 ///
 /// 数据集
-/// 
+///
 trait Dataset{
     ///
     /// Config被设计用来配置无法从数据中学习到的参数
-    /// 
+    ///
     fn config(self, config: serde_json::Value);
 
     ///
@@ -16,8 +16,8 @@ trait Dataset{
     // - User load the Dataset object from the disk. 用户从磁盘加载Dataset对象。
     // - User call `setup_data` to load new data. 用户调用' setup_data '来加载新数据。
     // - User prepare data for model based on previous status. 用户根据以前的状态为模型准备数据。
-    /// 
-    /// 
+    ///
+    ///
     fn setup_date(self);
 
     ///
@@ -26,28 +26,28 @@ trait Dataset{
     // The method should:
     // - process the data
     // - return the processed data
-    /// 
+    ///
     fn prepare(self);
 }
 
 ///
 /// 序列化
-/// 
+///
 trait Serializable{
     ///
     /// 持久化
-    /// 
+    ///
     fn to_pickle(self, path: String)->anyhow::Result<bool>;
 
     ///
     /// 加载持久化数据
-    /// 
+    ///
     fn load(self, path: String) -> anyhow::Result<DataFrame>;
 }
 
 ///
 /// 数据加载
-/// 
+///
 trait DataLoader{
     fn load(self, instruments: String, start_end: StratEndRange) -> anyhow::Result<DataFrame>;
 }
@@ -58,8 +58,8 @@ trait DataLoader{
 //  Only following data processing functions should be placed in Dataset: 数据集中只应放置以下数据处理函数:
 // - The processing is related to specific model. 处理与具体的模型有关。
 // - The processing is related to data split. 处理与数据分割有关。
-/// 
-/// 
+///
+///
 struct DatasetH{
     pub segments: Segments,
     pub handler: DataHandler
@@ -68,7 +68,7 @@ struct DatasetH{
 impl Dataset for DatasetH{
     ///
     /// 解析配置
-    /// 
+    ///
     fn config(self, config: serde_json::Value) {
         todo!()
     }
@@ -85,38 +85,38 @@ impl Dataset for DatasetH{
 
 ///
 /// 数据处理
-/// 
+///
 struct DataHandler{
     ///
     /// The stock list to retrieve. 基线股票集合
-    /// 
+    ///
     pub instruments: String,
 
     ///
     /// start_time of the original data. 原始数据的开始时间
-    ///         
+    ///
     pub start_time: String,
 
     ///
     /// end_time of the original data.  原始数据的结束时间
-    /// 
+    ///
     pub end_time :String,
 
     ///
     /// data loader to load the data.
-    ///     
+    ///
     pub data_loader : Box<dyn DataLoader>,
-            
+
     ///
     /// initialize the original data in the constructor.
-    /// 
+    ///
     pub  init_data: String,
-            
+
     ///
     /// Return the original data instead of copy if possible.
-    /// 
+    ///
     pub fetch_orig:bool,
-            
+
 }
 
 impl Serializable for DataHandler{
@@ -133,7 +133,7 @@ impl Serializable for DataHandler{
 
 ///
 /// 片段
-/// 1) 
+/// 1)
 /// ```json
 /// 'segments': {
 ///    'train': ("2008-01-01", "2014-12-31"),
@@ -141,14 +141,14 @@ impl Serializable for DataHandler{
 ///    'test': ("2015-01-01", "2016-12-31",),
 ///  }
 /// ```
-/// 2) 
+/// 2)
 /// ```json
 ///  'segments': {
 ///    'insample': ("2008-01-01", "2014-12-31"),
 ///    'outsample': ("2017-01-01", "2020-08-01",),
 ///  }
 /// ```
-/// 
+///
 enum Segments{
     TVT(SegmentTVT),
     SIMPLE(SegmentsSimple)
@@ -156,7 +156,7 @@ enum Segments{
 
 ///
 /// 机器学习常用切片分组
-/// 
+///
 struct SegmentTVT{
     pub train: StratEndRange,
     pub valid: StratEndRange,
@@ -165,7 +165,7 @@ struct SegmentTVT{
 
 ///
 /// 简单切片，包含输入输出范围
-/// 
+///
 struct SegmentsSimple{
     pub insample: StratEndRange,
     pub outsample: StratEndRange
@@ -173,7 +173,7 @@ struct SegmentsSimple{
 
 ///
 /// 开始结束范围
-/// 
+///
 struct StratEndRange{
     pub start: String,
     pub end: String,
@@ -187,19 +187,19 @@ mod dataset_works{
 
     #[test]
     fn dataset_h_works(){
-        let segments = Segments::TVT(super::SegmentTVT { 
-            train: super::StratEndRange { 
+        let segments = Segments::TVT(super::SegmentTVT {
+            train: super::StratEndRange {
                 start: String::from("2008-01-01"),
-                end: String::from("2017-12-31") 
-            }, 
-            valid: super::StratEndRange { 
+                end: String::from("2017-12-31")
+            },
+            valid: super::StratEndRange {
                 start: String::from("2008-01-01"),
-                end: String::from("2017-12-31") 
-            }, 
-            test: super::StratEndRange { 
+                end: String::from("2017-12-31")
+            },
+            test: super::StratEndRange {
                 start: String::from("2008-01-01"),
-                end: String::from("2017-12-31") 
-            } 
+                end: String::from("2017-12-31")
+            }
         });
 
         let handler: DataHandler = DataHandler{ instruments: todo!(), start_time: todo!(), end_time: todo!(), data_loader: todo!(), init_data: todo!(), fetch_orig: todo!() };
@@ -209,7 +209,7 @@ mod dataset_works{
             handler: handler,
         };
 
-        
+
 
 
     }
